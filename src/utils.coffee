@@ -39,3 +39,17 @@ exports.hasInsensitive = (object, key) ->
   for k, v of object
     return true if key == k.toLowerCase()
   return false
+
+headerStringToObject = exports.headerStringToObject = (headerString) ->
+  list = headerString.split '\n'
+  filteredList = list.filter (keyAndValue) -> not not keyAndValue
+  filteredList.reduce (acc, keyAndValue) ->
+    splitKey = keyAndValue.split ':'
+    acc[splitKey.shift()] = splitKey.shift().trim()
+    acc
+  , {}
+
+exports.normalizeXhrResponse = (xhr) ->
+  statusCode: xhr.status
+  body: JSON.parse(xhr.response)
+  headers: headerStringToObject(xhr.getAllResponseHeaders())

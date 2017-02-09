@@ -1,6 +1,6 @@
 querystring = require 'querystring'
 debug = require('debug') 'slumber:api'
-{callable, append_slash, merge, hasInsensitive} = require './utils'
+{callable, append_slash, merge, hasInsensitive, normalizeXhrResponse} = require './utils'
 request = require 'request'
 {Serializer} = require './Serializer'
 
@@ -13,6 +13,7 @@ API = callable class
     @opts.append_slash ?= true
     #@opts.session ?= null
     @opts.auth ?= null
+    @opts.http_client ?= 'request'
     @opts.request_opts ?=
       rejectUnauthorized: false
 
@@ -101,12 +102,35 @@ API = callable class
 
     return request_options
 
+  _xhr: (request_options, fn) =>
+    xhr = new XMLHttpRequest()
+    xhr.onload = (event) ->
+      normalizedResponse = normalizeXhrResponse(xhr)
+      fn null, normalizedResponse, normalizedResponse.body
+
+    xhr.open request_options.method, request_options.url, true
+
+    white_listed_headers = [ 'authorization', 'accept' ]
+    for key, value of request_options.headers
+      if key.toLowerCase() in white_listed_headers
+        xhr.setRequestHeader key, value
+
+    formData = null
+    if request_options.formData?
+      formData = new FormData()
+      for key, value of request_options.formData
+        formData.append key, value
+
+    xhr.send formData
 
   _request: (method, kwargs, fn) =>
     request_options = @_construct_request method, kwargs
 
     debug "#{method}", request_options.url
-    req = request request_options, fn
+    if @opts.http_client == 'xhr'
+      @_xhr request_options, fn
+    else
+      req = request request_options, fn
 
   callable: @::_create_child
 
